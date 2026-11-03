@@ -36,6 +36,8 @@ type ExportJob = {
 
 export function Studio() {
   const boot = useStudio((s) => s.boot);
+  const busy = useStudio((s) => s.busy);
+  const busyMessage = useStudio((s) => s.busyMessage);
   const audioUrl = useStudio((s) => s.audioUrl);
   const audioName = useStudio((s) => s.audioName);
   const audioBuffer = useStudio((s) => s.audioBuffer);
@@ -175,6 +177,7 @@ export function Studio() {
   }
 
   function ingest(list: FileList | File[]) {
+    if (busy) return;
     const { audio, images: pics } = takeAudioAndImages([...list]);
     if (audio) void addAudio(audio);
     if (pics.length) void addImages(pics);
@@ -184,6 +187,7 @@ export function Studio() {
     event.preventDefault();
     dragDepth.current = 0;
     setHot(false);
+    if (busy) return;
     ingest(event.dataTransfer.files);
   }
 
@@ -279,7 +283,7 @@ export function Studio() {
           <h1 className="font-serif text-2xl leading-none">Adegan</h1>
           <p className="mt-1 truncate text-sm text-muted">{summary}</p>
         </div>
-        <button className="btn btn-primary shrink-0" type="button" disabled={!ready || job?.running} onClick={() => void startExport()}>
+        <button className="btn btn-primary shrink-0" type="button" disabled={!ready || job?.running || busy} onClick={() => void startExport()}>
           <Download className="size-4" aria-hidden="true" />
           Unduh MP4
         </button>
@@ -338,7 +342,7 @@ export function Studio() {
           <p className="field-label">Audio</p>
           <div className="file-row">
             <p className="min-w-0 truncate text-sm text-muted">{audioName ?? "Belum ada narasi"}</p>
-            <button className="btn btn-ghost" type="button" onClick={() => audioInputRef.current?.click()}>
+            <button className="btn btn-ghost" type="button" disabled={busy} onClick={() => audioInputRef.current?.click()}>
               <Music className="size-4" aria-hidden="true" />
               Pilih
             </button>
@@ -359,15 +363,15 @@ export function Studio() {
         <div>
           <p className="field-label">Gambar scene</p>
           <div className="flex flex-wrap gap-2">
-            <button className="btn btn-ghost" type="button" onClick={() => imageInputRef.current?.click()}>
+            <button className="btn btn-ghost" type="button" disabled={busy} onClick={() => imageInputRef.current?.click()}>
               <ImagePlus className="size-4" aria-hidden="true" />
               Gambar
             </button>
-            <button className="btn btn-ghost" type="button" onClick={() => folderInputRef.current?.click()}>
+            <button className="btn btn-ghost" type="button" disabled={busy} onClick={() => folderInputRef.current?.click()}>
               <FolderOpen className="size-4" aria-hidden="true" />
               Folder
             </button>
-            <button className="btn btn-ghost" type="button" onClick={sortByName} disabled={images.length < 2}>
+            <button className="btn btn-ghost" type="button" onClick={sortByName} disabled={busy || images.length < 2}>
               Urutkan nama
             </button>
           </div>
@@ -487,7 +491,7 @@ export function Studio() {
 
         {storageWarning ? <p className="hint">{storageWarning}</p> : null}
 
-        <button className="btn btn-ghost self-start" type="button" onClick={reset} disabled={!audioName && images.length === 0}>
+        <button className="btn btn-ghost self-start" type="button" onClick={reset} disabled={busy || (!audioName && images.length === 0)}>
           <RotateCcw className="size-4" aria-hidden="true" />
           Hapus proyek
         </button>
@@ -500,82 +504,71 @@ export function Studio() {
           onPointerDown={(event) => {
             if ((event.target as HTMLElement).closest("[data-handle]")) return;
             const rect = event.currentTarget.getBoundingClientRect();
-            if (rect.width <= 0 || duration <= 0) return;
-            seek(((event.clientX - rect.left) / rect.width) * duration);
+            const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+            seek(ratio * duration);
           }}
         >
-          {scenes.map((scene, index) => (
-            <div
-              key={`${scene.start}-${index}`}
-              className="time-chunk"
-              data-active={index === sceneIndex ? "true" : "false"}
-              style={{ flexGrow: Math.max(0.05, scene.end - scene.start) }}
-            >
-              {index < scenes.length - 1 ? (
-                <button
-                  type="button"
-                  data-handle
-                  className="handle"
-                  aria-label={`Geser batas scene ${index + 1}`}
-                  onPointerDown={(event) => {
-                    event.stopPropagation();
-                    const handle = event.currentTarget;
-                    handle.setPointerCapture(event.pointerId);
-                    let raf = 0;
-                    let pending = scene.end;
-                    const move = (ev: PointerEvent) => {
+          {scenes.map((scene, index) => {
+            const width = duration > 0 ? ((scene.end - scene.start) / duration) * 100 : 0;
+            return (
+              <div
+                key={index}
+                className="time-chunk"
+                data-active={index === sceneIndex ? "true" : undefined}
+                style={{ width: `${width}%` }}
+              >
+                {index < scenes.length - 1 ? (
+                  <button
+                    type="button"
+                    className="handle"
+                    data-handle
+                    aria-label={`Batas scene ${index + 1}`}
+                    onPointerDown={(event) => {
+                      event.stopPropagation();
                       const track = trackRef.current;
-                      if (!track || duration <= 0) return;
-                      const rect = track.getBoundingClientRect();
-                      const ratio = Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width));
-                      pending = ratio * duration;
-                      if (!raf) {
-                        raf = requestAnimationFrame(() => {
-                          raf = 0;
-                          updateBoundary(index, pending);
-                        });
-                      }
-                    };
-                    const up = () => {
-                      handle.removeEventListener("pointermove", move);
-                      handle.removeEventListener("pointerup", up);
-                      if (raf) cancelAnimationFrame(raf);
-                      updateBoundary(index, pending);
-                    };
-                    handle.addEventListener("pointermove", move);
-                    handle.addEventListener("pointerup", up);
-                  }}
-                />
-              ) : null}
-            </div>
-          ))}
-          {duration > 0 ? <div ref={playheadRef} className="playhead" style={{ left: "0%" }} /> : null}
+                      if (!track) return;
+                      const onMove = (e: PointerEvent) => {
+                        const rect = track.getBoundingClientRect();
+                        const r = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+                        updateBoundary(index, r * duration);
+                      };
+                      const onUp = () => {
+                        window.removeEventListener("pointermove", onMove);
+                        window.removeEventListener("pointerup", onUp);
+                      };
+                      window.addEventListener("pointermove", onMove);
+                      window.addEventListener("pointerup", onUp);
+                    }}
+                  />
+                ) : null}
+              </div>
+            );
+          })}
+          <div ref={playheadRef} className="playhead" />
         </div>
+
         <div className="chip-row">
           {images.map((img, index) => (
-            <div
-              key={img.id}
-              id={`scene-${index}`}
-              className="scene-chip"
-              data-active={index === sceneIndex || index === selected ? "true" : "false"}
-              draggable
-              onDragStart={(event) => {
-                event.dataTransfer.setData("text/plain", img.id);
-                event.dataTransfer.effectAllowed = "move";
-              }}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault();
-                reorder(event.dataTransfer.getData("text/plain"), img.id);
-              }}
-            >
+            <div key={img.id}>
               <button
+                id={`scene-${index}`}
                 type="button"
-                className="block w-full bg-transparent p-0 text-left text-fg"
+                className="scene-chip"
+                data-active={index === sceneIndex ? "true" : undefined}
                 onClick={() => {
                   setSelected(index);
-                  if (scenes[index]) seek(scenes[index].start);
+                  if (scenes[index]) seek(scenes[index].start + 0.01);
                 }}
+                onDragStart={(event) => {
+                  event.dataTransfer.setData("text/plain", img.id);
+                }}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  const fromId = event.dataTransfer.getData("text/plain");
+                  if (fromId) reorder(fromId, img.id);
+                }}
+                draggable
               >
                 <img src={img.url} alt="" />
                 <span className="mt-1 block truncate text-sm tabular-nums">
@@ -588,6 +581,18 @@ export function Studio() {
           {images.length === 0 ? <p className="hint">Timeline muncul setelah gambar masuk.</p> : null}
         </div>
       </section>
+
+      {busy ? (
+        <div className="scrim" role="status" aria-live="polite" aria-label="Memproses">
+          <div className="dialog">
+            <h2 className="font-serif text-2xl">Sedang memproses</h2>
+            <p className="hint mt-2">{busyMessage || "Tunggu sebentar…"}</p>
+            <div className="bar mt-4" aria-hidden="true">
+              <span style={{ width: "60%" }} className="animate-pulse" />
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {job ? (
         <div className="scrim" role="dialog" aria-modal="true" aria-label="Ekspor MP4">
