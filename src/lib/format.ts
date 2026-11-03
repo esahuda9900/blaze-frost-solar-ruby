@@ -34,6 +34,19 @@ export function frameSize(
 }
 
 export function compareNames(a: string, b: string): number {
+  const sceneNumber = (name: string) => {
+    const matches = [...name.matchAll(/(?:^|[^\d])((?:\d+))(?!\d)/g)];
+    const last = matches.at(-1)?.[1];
+    return last == null ? null : Number(last);
+  };
+  const aNumber = sceneNumber(a);
+  const bNumber = sceneNumber(b);
+
+  if (aNumber !== null && bNumber !== null && aNumber !== bNumber) {
+    return aNumber - bNumber;
+  }
+  if (aNumber !== null && bNumber === null) return -1;
+  if (aNumber === null && bNumber !== null) return 1;
   return a.localeCompare(b, "id", { numeric: true, sensitivity: "base" });
 }
 

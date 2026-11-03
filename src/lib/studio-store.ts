@@ -56,7 +56,7 @@ type StudioState = {
   clearImages: () => void;
   setMode: (mode: SyncMode) => void;
   setTimelineText: (text: string) => void;
-  applyTimeline: () => void;
+  applyTimeline: (textOverride?: string) => void;
   recomputeScenes: () => void;
   setAspect: (v: AspectId) => void;
   setFit: (v: FitMode) => void;
@@ -113,10 +113,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   status: "idle",
   statusMsg: "",
   exportProgress: 0,
-  hydrated: false,
+  hydrated: true,
 
   hydrate: async () => {
     if (get().hydrated) return;
+    set({ hydrated: true });
     try {
       const saved = await loadProject();
       if (!saved) {
@@ -263,8 +264,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   setTimelineText: (text) => set({ timelineText: text, timelineError: null }),
 
-  applyTimeline: () => {
-    const text = get().timelineText;
+  applyTimeline: (textOverride?: string) => {
+    const text = textOverride ?? get().timelineText;
     const result = parseTimelineScript(text);
     if (!result.ok) {
       set({ timelineError: result.error, scenes: [] });

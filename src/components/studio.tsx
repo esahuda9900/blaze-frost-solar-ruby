@@ -164,6 +164,7 @@ export function Studio() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const rafRef = useRef<number>(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const timelineInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const currentIndex = useMemo(
     () => (scenes.length ? sceneIndexAt(scenes, currentTime) : -1),
@@ -440,11 +441,16 @@ export function Studio() {
             <textarea
               className="w-full min-h-[9rem] rounded-xl bg-[var(--color-surface)] border border-[color-mix(in_srgb,var(--color-fg)_14%,transparent)] p-3 text-sm font-mono leading-relaxed resize-y"
               placeholder={`* Scene 1 [00:00 - 00:05]\n* Scene 2 [00:05 - 00:08]\n…`}
+              ref={timelineInputRef}
               value={timelineText}
               onChange={(e) => setTimelineText(e.target.value)}
             />
             <div className="mt-2 flex flex-wrap gap-2">
-              <button type="button" className="btn btn-primary" onClick={applyTimeline}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => applyTimeline(timelineInputRef.current?.value)}
+              >
                 Terapkan Timeline
               </button>
               {scenes.length > 0 && (

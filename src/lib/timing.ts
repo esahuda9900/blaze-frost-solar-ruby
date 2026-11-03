@@ -207,8 +207,8 @@ function quietestCut(
   const pad = (b - a) * 0.2;
   const t0 = a + pad;
   const t1 = b - pad;
-  let i0 = Math.max(0, Math.floor((t0 * sampleRate) / hop));
-  let i1 = Math.min(rms.length - 1, Math.ceil((t1 * sampleRate) / hop));
+  const i0 = Math.max(0, Math.floor((t0 * sampleRate) / hop));
+  const i1 = Math.min(rms.length - 1, Math.ceil((t1 * sampleRate) / hop));
   if (i1 <= i0) return (a + b) / 2;
   let best = i0;
   let bestVal = Infinity;
