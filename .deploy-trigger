@@ -1,2 +1,1 @@
-triggered: 2026-11-04T09:08+07:00
-purpose: force vercel rebuild from main with timeline UI fix
+deploy-trigger 2026-11-04T05:45Z timeline-ux + mobile panel
