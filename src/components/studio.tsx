@@ -60,11 +60,7 @@ function DropZone({
       <div className="flex flex-col items-start gap-2">
         <p className="font-medium">{label}</p>
         <p className="hint">{hint}</p>
-        <button
-          type="button"
-          className="btn btn-ghost mt-1"
-          onClick={() => inputRef.current?.click()}
-        >
+        <button type="button" className="btn btn-ghost mt-1" onClick={() => inputRef.current?.click()}>
           <Upload className="size-4" />
           Pilih file
         </button>
@@ -311,24 +307,16 @@ export function Studio() {
           <h1 className="text-lg font-semibold tracking-tight" style={{ fontFamily: "var(--font-serif)" }}>
             Adegan
           </h1>
-          <p className="text-xs text-[var(--color-muted)]">Audio + gambar scene · timing rigid dari skrip</p>
+          <p className="text-xs text-[var(--color-muted)]">
+            Audio + gambar · timeline skrip · v2
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={() => void resetAll()}
-            title="Reset semua"
-          >
+          <button type="button" className="btn btn-ghost" onClick={() => void resetAll()} title="Reset semua">
             <RotateCcw className="size-4" />
             <span className="hidden sm:inline">Reset</span>
           </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={!canExport}
-            onClick={() => void onExport()}
-          >
+          <button type="button" className="btn btn-primary" disabled={!canExport} onClick={() => void onExport()}>
             <Download className="size-4" />
             Unduh MP4
           </button>
@@ -339,12 +327,7 @@ export function Studio() {
         <div className="stage-frame">
           <div
             className="stage-aspect"
-            style={
-              {
-                "--aw": aspectMeta.w,
-                "--ah": aspectMeta.h,
-              } as React.CSSProperties
-            }
+            style={{ "--aw": aspectMeta.w, "--ah": aspectMeta.h } as React.CSSProperties}
           >
             {previewUrl ? (
               <img src={previewUrl} alt="" className="stage-photo" style={{ objectFit: fit }} />
@@ -371,13 +354,7 @@ export function Studio() {
         </div>
 
         <div className="flex items-center gap-3 px-1">
-          <button
-            type="button"
-            className="icon-btn"
-            disabled={!audioBuffer}
-            onClick={togglePlay}
-            aria-label={playing ? "Pause" : "Play"}
-          >
+          <button type="button" className="icon-btn" disabled={!audioBuffer} onClick={togglePlay} aria-label={playing ? "Pause" : "Play"}>
             {playing ? <Pause className="size-5" /> : <Play className="size-5" />}
           </button>
           <div className="flex-1">
@@ -397,12 +374,7 @@ export function Studio() {
           </span>
         </div>
 
-        <SceneStrip
-          images={images}
-          scenes={scenes}
-          currentIndex={currentIndex}
-          onSeek={seekTo}
-        />
+        <SceneStrip images={images} scenes={scenes} currentIndex={currentIndex} onSeek={seekTo} />
       </section>
 
       <aside className="studio-panel panel-scroll">
@@ -438,9 +410,7 @@ export function Studio() {
               </span>
             )}
           </div>
-          {timelineError && (
-            <p className="mt-2 text-sm text-amber-300/90 leading-snug">{timelineError}</p>
-          )}
+          {timelineError && <p className="mt-2 text-sm text-amber-300/90 leading-snug">{timelineError}</p>}
           {!timelineError && scenes.length > 0 && mode === "custom" && (
             <p className="mt-2 text-xs text-emerald-300/90">
               ✓ Timeline aktif. Upload {scenes.length} gambar: PO (1) → PO ({scenes.length}).
@@ -451,23 +421,13 @@ export function Studio() {
         <div>
           <p className="field-label">Mode sinkron</p>
           <div className="segment" role="radiogroup">
-            {(
-              [
-                ["custom", "Skrip"],
-                ["breath", "Napas"],
-                ["even", "Rata"],
-              ] as [SyncMode, string][]
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                role="radio"
-                aria-checked={mode === id}
-                onClick={() => setMode(id)}
-              >
-                {label}
-              </button>
-            ))}
+            {([["custom", "Skrip"], ["breath", "Napas"], ["even", "Rata"]] as [SyncMode, string][]).map(
+              ([id, label]) => (
+                <button key={id} type="button" role="radio" aria-checked={mode === id} onClick={() => setMode(id)}>
+                  {label}
+                </button>
+              ),
+            )}
           </div>
           <p className="hint mt-2">
             {mode === "custom"
@@ -495,9 +455,7 @@ export function Studio() {
               <div className="flex items-center gap-2 min-w-0">
                 <Music2 className="size-4 shrink-0 text-[var(--color-accent)]" />
                 <span className="truncate text-sm">{audioName}</span>
-                <span className="text-xs text-[var(--color-muted)] shrink-0">
-                  {formatSeconds(audioDuration)}
-                </span>
+                <span className="text-xs text-[var(--color-muted)] shrink-0">{formatSeconds(audioDuration)}</span>
               </div>
               <button type="button" className="icon-btn !w-9 !h-9" onClick={() => void setAudio(null)}>
                 <Trash2 className="size-4" />
@@ -560,12 +518,7 @@ export function Studio() {
           <p className="field-label">Aspect & kualitas</p>
           <div className="segment mb-2">
             {(Object.keys(ASPECTS) as AspectId[]).map((id) => (
-              <button
-                key={id}
-                type="button"
-                aria-checked={aspect === id}
-                onClick={() => setAspect(id)}
-              >
+              <button key={id} type="button" aria-checked={aspect === id} onClick={() => setAspect(id)}>
                 {ASPECTS[id].label}
               </button>
             ))}
