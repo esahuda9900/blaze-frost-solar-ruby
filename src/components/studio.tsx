@@ -408,8 +408,9 @@ export function Studio() {
         <div className="rounded-2xl border border-[color-mix(in_srgb,var(--color-accent)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-surface))] p-3">
           <p className="field-label mb-1">Timeline skrip (durasi tiap gambar)</p>
           <p className="hint mt-0 mb-2 text-xs">
-            Paste skrip di bawah, klik <strong>Terapkan</strong>, lalu upload gambar PO (1), PO (2), … sesuai urutan scene.
-            Durasi visual = rentang waktu di skrip.
+            Paste skrip lengkap. Durasi tiap gambar dikunci ke jam di skrip:
+            file <strong>PO (1)</strong> = Scene 1, <strong>PO (2)</strong> = Scene 2, sampai PO terakhir.
+            Mode Napas/Rata tidak dipakai saat ekspor.
           </p>
           <textarea
             className="w-full min-h-[10rem] rounded-xl bg-[var(--color-bg)] border border-[color-mix(in_srgb,var(--color-fg)_18%,transparent)] p-3 text-sm font-mono leading-relaxed resize-y"
@@ -519,22 +520,32 @@ export function Studio() {
             accept="image/*"
             multiple
             label="Upload PO (1) … PO (79)"
-            hint="Urutan nama = urutan scene. Sort otomatis numeric."
+            hint="Nama file PO (1) … PO (79). PO (n) = Scene n di skrip."
             onFiles={(files) => void addImages(files)}
           />
           {images.length > 0 && (
             <ul className="mt-2 max-h-40 overflow-y-auto space-y-1 text-sm">
-              {images.map((img, i) => (
-                <li key={img.id} className="flex items-center gap-2 py-1">
-                  <img src={img.url} alt="" className="w-8 h-8 rounded object-cover" />
-                  <span className="flex-1 truncate">
-                    {i + 1}. {img.name}
-                  </span>
-                  <button type="button" className="text-[var(--color-muted)]" onClick={() => removeImage(img.id)}>
-                    <Trash2 className="size-3.5" />
-                  </button>
-                </li>
-              ))}
+              {images.map((img) => {
+                const po = /po\s*[\(\[\-_]?\s*(\d+)/i.exec(img.name);
+                const n = po ? Number(po[1]) : 0;
+                const scene = n > 0 ? scenes[n - 1] : undefined;
+                const dur = scene ? scene.end - scene.start : 0;
+                return (
+                  <li key={img.id} className="flex items-center gap-2 py-1">
+                    <img src={img.url} alt="" className="w-8 h-8 rounded object-cover" />
+                    <span className="flex-1 truncate">
+                      {n > 0 ? `PO (${n})` : img.name}
+                      <span className="text-[var(--color-muted)]"> · {img.name}</span>
+                    </span>
+                    <span className="text-xs tabular-nums text-[var(--color-accent)] shrink-0">
+                      {dur > 0 ? formatSeconds(dur) : "—"}
+                    </span>
+                    <button type="button" className="text-[var(--color-muted)]" onClick={() => removeImage(img.id)}>
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

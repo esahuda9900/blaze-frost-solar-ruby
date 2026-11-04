@@ -17,6 +17,7 @@ export type SavedProject = {
   images: SavedImage[];
   scenes: SceneSpan[];
   mode: SyncMode;
+  timelineText?: string;
   aspect: AspectId;
   fit: FitMode;
   motion: boolean;

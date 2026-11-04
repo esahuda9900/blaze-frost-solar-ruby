@@ -78,8 +78,63 @@ function revokeAll(images: StudioImage[]) {
   }
 }
 
+function poIndex(name: string): number | null {
+  const m = name.match(/po\s*[\(\[\-_]?\s*(\d+)/i);
+  return m ? Number(m[1]) : null;
+}
+
 function sortImages(list: StudioImage[]): StudioImage[] {
-  return [...list].sort((a, b) => compareNames(a.name, b.name));
+  return [...list].sort((a, b) => {
+    const pa = poIndex(a.name);
+    const pb = poIndex(b.name);
+    if (pa != null && pb != null && pa !== pb) return pa - pb;
+    if (pa != null && pb == null) return -1;
+    if (pa == null && pb != null) return 1;
+    return compareNames(a.name, b.name);
+  });
+}
+
+/** PO (n) selalu nempel ke Scene n. Tanpa nomor PO, urutan file = urutan scene. */
+function alignImagesToScript(
+  images: StudioImage[],
+  count: number,
+): { images: StudioImage[]; error: string | null } {
+  const sorted = sortImages(images);
+  const byPo = new Map<number, StudioImage>();
+  let tagged = 0;
+  for (const img of sorted) {
+    const n = poIndex(img.name);
+    if (n == null) continue;
+    tagged += 1;
+    if (!byPo.has(n)) byPo.set(n, img);
+  }
+  if (tagged === 0) {
+    if (sorted.length !== count) {
+      return {
+        images: sorted,
+        error: `Jumlah gambar (${sorted.length}) ≠ scene di skrip (${count}). Upload PO (1) sampai PO (${count}).`,
+      };
+    }
+    return { images: sorted, error: null };
+  }
+  const missing: number[] = [];
+  const ordered: StudioImage[] = [];
+  for (let n = 1; n <= count; n++) {
+    const img = byPo.get(n);
+    if (!img) missing.push(n);
+    else ordered.push(img);
+  }
+  if (missing.length > 0) {
+    const preview = missing
+      .slice(0, 10)
+      .map((n) => `PO (${n})`)
+      .join(", ");
+    return {
+      images: ordered,
+      error: `Kurang ${missing.length} gambar: ${preview}${missing.length > 10 ? "…" : ""}. Nama file harus PO (1) … PO (${count}).`,
+    };
+  }
+  return { images: ordered, error: null };
 }
 
 async function decodeAudio(blob: Blob): Promise<AudioBuffer> {
@@ -146,15 +201,16 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         audioDuration,
         images: sortImages(images),
         scenes: saved.scenes ?? [],
-        mode: saved.mode ?? "custom",
+        mode: "custom",
+        timelineText: saved.timelineText ?? "",
         aspect: saved.aspect ?? "9:16",
         fit: saved.fit ?? "cover",
         motion: saved.motion ?? true,
         resolution: saved.resolution ?? 1080,
         hydrated: true,
       });
-      if (saved.mode !== "custom" && audioBuffer && images.length > 0) {
-        get().recomputeScenes();
+      if ((saved.timelineText ?? "").trim()) {
+        get().applyTimeline();
       }
     } catch (e) {
       console.error(e);
@@ -261,32 +317,37 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     void get().persist();
   },
 
-  setTimelineText: (text) => set({ timelineText: text, timelineError: null }),
+  setTimelineText: (text) => {
+    set({ timelineText: text });
+    get().applyTimeline();
+  },
 
   applyTimeline: () => {
     const text = get().timelineText;
     const result = parseTimelineScript(text);
     if (!result.ok) {
-      set({ timelineError: result.error, scenes: [] });
+      set({
+        timelineError: text.trim() ? result.error : null,
+        scenes: text.trim() ? [] : get().scenes,
+        mode: "custom",
+      });
       return;
     }
     const { scenes, count, lastEnd } = result;
-    const imgCount = get().images.length;
-    let msg: string | null = null;
-    if (imgCount > 0 && imgCount !== count) {
-      msg = `Jumlah gambar (${imgCount}) ≠ jumlah scene di skrip (${count}). Urutan gambar harus 1→${count}.`;
-    }
+    const aligned = alignImagesToScript(get().images, count);
+    let msg = aligned.error;
     const audioDur = get().audioDuration;
-    if (audioDur > 0 && Math.abs(lastEnd - audioDur) > 1.5) {
-      const note = `Timeline berakhir di ${lastEnd.toFixed(1)}s, audio ${audioDur.toFixed(1)}s. Visual ikut skrip.`;
+    if (audioDur > 0 && Math.abs(lastEnd - audioDur) > 2) {
+      const note = `Skrip sampai ${lastEnd.toFixed(1)}s, audio ${audioDur.toFixed(1)}s. Potongan visual tetap ikut jam di skrip.`;
       msg = msg ? `${msg} ${note}` : note;
     }
     set({
+      images: aligned.error ? get().images : aligned.images,
       scenes,
       mode: "custom",
       timelineError: msg,
       status: "idle",
-      statusMsg: msg ? "" : `Timeline diterapkan: ${count} scene`,
+      statusMsg: msg ? "" : `Skrip aktif: ${count} scene, PO (1) = Scene 1`,
     });
     void get().persist();
   },
@@ -347,7 +408,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         }),
       ),
       scenes: s.scenes,
-      mode: s.mode,
+      mode: "custom",
+      timelineText: s.timelineText,
       aspect: s.aspect,
       fit: s.fit,
       motion: s.motion,
@@ -403,28 +465,34 @@ export function getExportReady(): {
       images: [],
       audioBuffer: s.audioBuffer,
     };
-  if (s.scenes.length === 0) {
+  const parsed = parseTimelineScript(s.timelineText);
+  if (!parsed.ok) {
     return {
       ok: false,
-      reason:
-        s.mode === "custom"
-          ? "Paste timeline skrip dulu, lalu klik Terapkan Timeline."
-          : "Belum ada potongan scene. Coba hitung ulang.",
+      reason: s.timelineText.trim()
+        ? parsed.error
+        : "Paste timeline skrip dulu. Contoh: * Scene 1 [00:00 - 00:05]",
       scenes: [],
       images: s.images,
       audioBuffer: s.audioBuffer,
     };
   }
-  if (s.scenes.length !== s.images.length) {
+  const aligned = alignImagesToScript(s.images, parsed.count);
+  if (aligned.images.length !== parsed.count) {
     return {
       ok: false,
-      reason: `Jumlah scene (${s.scenes.length}) harus sama dengan jumlah gambar (${s.images.length}).`,
-      scenes: s.scenes,
+      reason: aligned.error ?? `Butuh ${parsed.count} gambar PO (1) … PO (${parsed.count}).`,
+      scenes: parsed.scenes,
       images: s.images,
       audioBuffer: s.audioBuffer,
     };
   }
-  return { ok: true, scenes: s.scenes, images: s.images, audioBuffer: s.audioBuffer };
+  return {
+    ok: true,
+    scenes: parsed.scenes,
+    images: aligned.images,
+    audioBuffer: s.audioBuffer,
+  };
 }
 
 export { frameSize };
